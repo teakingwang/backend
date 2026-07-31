@@ -43,7 +43,7 @@ func (uc *UserHTTPController) Login(c *gin.Context) {
 		"data": gin.H{
 			"token": token,
 			"user": gin.H{
-				"id":       user.ID,
+				"id":       user.UserID,
 				"username": user.Username,
 				"email":    user.Email,
 			},

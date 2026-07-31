@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package user;
 
-option go_package = "api/user;user"; // api/user是路径 user是包名（可省）
+option go_package = "api/user;user";
 import "google/api/annotations.proto";
 
 service UserService {
@@ -11,6 +11,7 @@ service UserService {
       get: "/v1/user/{id}"
     };
   }
+  rpc BatchGetUsers (BatchGetUsersRequest) returns (BatchGetUsersResponse) {}
 }
 
 message GetUserRequest {
@@ -21,4 +22,19 @@ message GetUserResponse {
   int64 id = 1;
   string username = 2;
   string email = 3;
+  string nickname = 4;
+}
+
+message BatchGetUsersRequest {
+  repeated int64 ids = 1;
+}
+
+message BatchGetUsersResponse {
+  repeated UserInfo users = 1;
+}
+
+message UserInfo {
+  int64 id = 1;
+  string username = 2;
+  string nickname = 3;
 }

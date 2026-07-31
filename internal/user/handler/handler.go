@@ -1,23 +1,40 @@
 package handler
 
 import (
-	"github.com/teakingwang/backend/pkg/errs"
+	"fmt"
 	"strconv"
 
-	"github.com/teakingwang/backend/api/user"
-	"github.com/teakingwang/backend/pkg/logger"
-
 	"github.com/gin-gonic/gin"
+	"github.com/teakingwang/backend/internal/user/model"
 	"github.com/teakingwang/backend/internal/user/service"
+	"github.com/teakingwang/backend/pkg/errs"
+	"github.com/teakingwang/backend/pkg/logger"
 )
 
 type UserHandler struct {
-	svc service.UserService
-	user.UnimplementedUserServiceServer
+	svc     service.UserService
+	rbacSvc service.RBACService
 }
 
-func NewUserHandler(svc service.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUserHandler(svc service.UserService, rbacSvc service.RBACService) *UserHandler {
+	return &UserHandler{svc: svc, rbacSvc: rbacSvc}
+}
+
+func dtoToItem(dto *service.UserDTO) *UserItem {
+	if dto == nil {
+		return nil
+	}
+	return &UserItem{
+		UserID:     fmt.Sprintf("%d", dto.UserID),
+		Username:   dto.Username,
+		Nickname:   dto.Nickname,
+		Email:      dto.Email,
+		Mobile:     dto.Mobile,
+		Status:     int8(dto.Status),
+		StatusName: dto.StatusName,
+		RoleID:     fmt.Sprintf("%d", dto.RoleID),
+		RoleName:   dto.RoleName,
+	}
 }
 
 func (h *UserHandler) Login(c *gin.Context) {
@@ -35,13 +52,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 	resp := &LoginResp{
 		Token: token,
-		User: &UserItem{
-			UserID:   userDTO.UserID,
-			Username: userDTO.Username,
-			Nickname: userDTO.Nickname,
-			Email:    userDTO.Email,
-			Mobile:   userDTO.Mobile,
-		},
+		User:  dtoToItem(userDTO),
 	}
 
 	errs.ResponseSuccessWithData(c, resp)
@@ -61,17 +72,8 @@ func (h *UserHandler) GetUserList(c *gin.Context) {
 	}
 
 	list := make([]*UserItem, 0, len(userDTOList))
-
 	for _, dto := range userDTOList {
-		list = append(list, &UserItem{
-			UserID:     dto.UserID,
-			Username:   dto.Username,
-			Nickname:   dto.Nickname,
-			Email:      dto.Email,
-			Mobile:     dto.Mobile,
-			StatusName: dto.StatusName,
-			RoleName:   dto.RoleName,
-		})
+		list = append(list, dtoToItem(dto))
 	}
 
 	resp := GetUserListResp{
@@ -89,27 +91,25 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 		errs.ResponseError(c, errs.CodeInvalidArgs, "missing user ID")
 		return
 	}
-	// 如果需要将 id 转换成 int 类型
-	idInt, err := strconv.Atoi(id)
+	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeInvalidArgs, "invalid user ID")
 		return
 	}
 
-	userDTO, err := h.svc.GetUser(c.Request.Context(), int64(idInt))
+	userDTO, err := h.svc.GetUser(c.Request.Context(), idInt)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeDatabaseError, err.Error())
 		return
 	}
 
+	if userDTO == nil {
+		errs.ResponseError(c, errs.CodeNotFound, "用户不存在")
+		return
+	}
+
 	resp := GetUserResp{
-		User: &UserItem{
-			UserID:   userDTO.UserID,
-			Username: userDTO.Username,
-			Nickname: userDTO.Nickname,
-			Email:    userDTO.Email,
-			Mobile:   userDTO.Mobile,
-		},
+		User: dtoToItem(userDTO),
 	}
 
 	errs.ResponseSuccessWithData(c, resp)
@@ -122,18 +122,14 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	userDTO, err := h.svc.CreateUser(c.Request.Context(), req.Username, req.Password, req.Email, req.Nickname)
+	userDTO, err := h.svc.CreateUser(c.Request.Context(), req.Username, req.Password, req.Email, req.Nickname, req.RoleID)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeDatabaseError, err.Error())
 		return
 	}
 
 	resp := CreateUserResp{
-		User: &UserItem{
-			UserID:   userDTO.UserID,
-			Username: userDTO.Username,
-			Nickname: userDTO.Nickname,
-		},
+		User: dtoToItem(userDTO),
 	}
 
 	errs.ResponseSuccessWithData(c, resp)
@@ -146,14 +142,13 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		errs.ResponseError(c, errs.CodeInvalidArgs, "missing user ID")
 		return
 	}
-	// 将 id 转换成 int 类型
-	idInt, err := strconv.Atoi(id)
+	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeInvalidArgs, "invalid user ID")
 		return
 	}
 
-	err = h.svc.DeleteUser(c.Request.Context(), int64(idInt))
+	err = h.svc.DeleteUser(c.Request.Context(), idInt)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeDatabaseError, err.Error())
 		return
@@ -169,8 +164,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		errs.ResponseError(c, errs.CodeInvalidArgs, "missing user ID")
 		return
 	}
-	// 将 id 转换成 int 类型
-	idInt, err := strconv.Atoi(id)
+	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeInvalidArgs, "invalid user ID")
 		return
@@ -182,18 +176,20 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	userDTO, err := h.svc.UpdateUser(c.Request.Context(), int64(idInt), req.Password, req.Email, req.Nickname)
+	var status *model.UserStatus
+	if req.Status != nil {
+		s := model.UserStatus(*req.Status)
+		status = &s
+	}
+
+	userDTO, err := h.svc.UpdateUser(c.Request.Context(), idInt, req.Password, req.Email, req.Nickname, req.RoleID, status)
 	if err != nil {
 		errs.ResponseError(c, errs.CodeDatabaseError, err.Error())
 		return
 	}
 
 	resp := UpdateUserResp{
-		User: &UserItem{
-			UserID:   userDTO.UserID,
-			Username: userDTO.Username,
-			Nickname: userDTO.Nickname,
-		},
+		User: dtoToItem(userDTO),
 	}
 
 	errs.ResponseSuccessWithData(c, resp)

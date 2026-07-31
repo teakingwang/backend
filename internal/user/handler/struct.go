@@ -6,10 +6,12 @@ type LoginReq struct {
 }
 
 type UserItem struct {
-	UserID     int64  `json:"user_id"`
+	UserID     string `json:"user_id"`
 	Username   string `json:"username"`
 	Nickname   string `json:"nickname"`
+	Status     int8   `json:"status"`
 	StatusName string `json:"status_name"`
+	RoleID     string `json:"role_id"`
 	RoleName   string `json:"role_name"`
 	Email      string `json:"email"`
 	Mobile     string `json:"mobile"`
@@ -36,6 +38,7 @@ type CreateUserReq struct {
 	Password string `json:"password" binding:"required"`
 	Email    string `json:"email" binding:"omitempty,email"`
 	Nickname string `json:"nickname" binding:"required"`
+	RoleID   int64  `json:"role_id"`
 }
 
 type CreateUserResp struct {
@@ -46,6 +49,8 @@ type UpdateUserReq struct {
 	Password string `json:"password" binding:"omitempty"`
 	Email    string `json:"email" binding:"omitempty,email"`
 	Nickname string `json:"nickname" binding:"omitempty"`
+	RoleID   int64  `json:"role_id"`
+	Status   *int8  `json:"status"`
 }
 
 type UpdateUserResp struct {

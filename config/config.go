@@ -2,10 +2,14 @@ package config
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/hashicorp/consul/api"
 	"github.com/spf13/viper"
-	"os"
 )
 
 var Config *config
@@ -28,8 +32,7 @@ type KafkaConfig struct {
 }
 
 type ServerConfig struct {
-	User  ServiceConfig `yaml:"user" json:"user"`
-	Order ServiceConfig `yaml:"order" json:"order"`
+	User ServiceConfig `yaml:"user" json:"user"`
 }
 
 type ServiceConfig struct {
@@ -89,17 +92,42 @@ type ConsulConfig struct {
 }
 
 func LoadConfig() error {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	path := os.Getenv("MY_APP_CONFIG_PATH")
-	if path == "" {
-		path = "./resources"
-	}
-	viper.AddConfigPath(path)
-	viper.AutomaticEnv()
+	var configPath string
+	flag.StringVar(&configPath, "config", "", "config file path, e.g. -config=./resources/config.yaml")
+	flag.Parse()
 
-	if err := viper.ReadInConfig(); err != nil {
-		return err
+	if configPath != "" {
+		ext := strings.ToLower(filepath.Ext(configPath))
+		switch ext {
+		case ".yaml", ".yml":
+			viper.SetConfigType("yaml")
+		case ".json":
+			viper.SetConfigType("json")
+		case ".toml":
+			viper.SetConfigType("toml")
+		default:
+			viper.SetConfigType("yaml")
+		}
+		file, err := os.Open(configPath)
+		if err != nil {
+			return fmt.Errorf("open config file failed: %w", err)
+		}
+		defer file.Close()
+		if err := viper.ReadConfig(file); err != nil {
+			return fmt.Errorf("read config file failed: %w", err)
+		}
+	} else {
+		viper.SetConfigName("config_debug")
+		viper.SetConfigType("yaml")
+		path := os.Getenv("MY_APP_CONFIG_PATH")
+		if path == "" {
+			path = "./resources"
+		}
+		viper.AddConfigPath(path)
+		viper.AutomaticEnv()
+		if err := viper.ReadInConfig(); err != nil {
+			return err
+		}
 	}
 
 	var cfg config

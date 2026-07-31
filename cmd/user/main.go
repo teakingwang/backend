@@ -2,16 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/teakingwang/backend/api/user"
-	"github.com/teakingwang/backend/config"
-	"github.com/teakingwang/backend/internal/user/app"
-	"github.com/teakingwang/backend/internal/user/controller"
-	"github.com/teakingwang/backend/pkg/consul"
-	"github.com/teakingwang/backend/pkg/logger"
-	"github.com/teakingwang/backend/pkg/utils/idgen"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +10,18 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/teakingwang/backend/api/user"
+	"github.com/teakingwang/backend/config"
+	"github.com/teakingwang/backend/internal/user/app"
+	"github.com/teakingwang/backend/internal/user/controller"
+	"github.com/teakingwang/backend/pkg/auth"
+	"github.com/teakingwang/backend/pkg/consul"
+	"github.com/teakingwang/backend/pkg/logger"
+	"github.com/teakingwang/backend/pkg/utils/idgen"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func main() {
@@ -42,6 +44,8 @@ func main() {
 		}
 	}
 
+	auth.Init(config.Config.JWT.Secret, config.Config.JWT.ExpireSeconds)
+
 	if err := idgen.Init(); err != nil {
 		panic(fmt.Errorf("failed to initialize idgen: %v", err))
 	}
@@ -50,7 +54,6 @@ func main() {
 		logger.Errorf("service exited with error: %v", err)
 	}
 
-	// 等待退出信号
 	waitForShutdown()
 }
 
@@ -60,17 +63,15 @@ func run() error {
 		panic(fmt.Errorf("new appcontext err:%v", err))
 	}
 
-	// 启动 HTTP 服务
 	go func() {
 		httpAddr := ":" + config.Config.Server.User.HTTPPort
-		router := controller.NewHTTPRouter(ctx.UserService)
+		router := controller.NewHTTPRouter(ctx.UserService, ctx.RBACService, ctx.MedicalRecordService)
 		logger.Infof("HTTP server listening on %s", httpAddr)
 		if err := http.ListenAndServe(httpAddr, router); err != nil {
 			logger.Errorf("HTTP server error: %v", err)
 		}
 	}()
 
-	// 启动 gRPC 服务
 	go func() {
 		grpcAddr := "0.0.0.0:" + config.Config.Server.User.GRPCPort
 		lis, err := net.Listen("tcp", grpcAddr)
@@ -83,7 +84,6 @@ func run() error {
 		registerHealthCheck(s)
 		user.RegisterUserServiceServer(s, controller.NewUserController(ctx.UserService))
 
-		// 注册到 Consul
 		consulClient, err := consul.NewConsulClient(config.Config.Consul.Address)
 		if err != nil {
 			logger.Errorf("failed to create consul client: %v", err)
@@ -111,9 +111,7 @@ func run() error {
 		}
 	}()
 
-	// 等待退出信号
 	waitForShutdown()
-
 	return nil
 }
 
@@ -129,7 +127,6 @@ func waitForShutdown() {
 
 func registerHealthCheck(s *grpc.Server) {
 	hs := health.NewServer()
-	// 设置空服务名和 user 服务名的健康状态
 	hs.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	hs.SetServingStatus("user", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(s, hs)

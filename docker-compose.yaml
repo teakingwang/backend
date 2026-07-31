@@ -39,8 +39,8 @@ services:
     image: hashicorp/consul:1.16
     container_name: consul
     ports:
-      - "8500:8500"    # Web UI 和 API
-      - "8600:8600/udp" # DNS 服务（可选）
+      - "8500:8500"
+      - "8600:8600/udp"
     networks:
       - gin
     volumes:
@@ -50,8 +50,9 @@ services:
 
   user:
     build:
-      context: ../ginmicro
+      context: .
       dockerfile: cmd/user/Dockerfile
+    container_name: backend-user-1
     environment:
       SERVICE_ID: "user-1"
       SERVICE_NAME: "user"
@@ -62,24 +63,7 @@ services:
     networks:
       - gin
     volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
-    restart: unless-stopped
-
-  order:
-    build:
-      context: ../ginmicro
-      dockerfile: cmd/order/Dockerfile
-    environment:
-      SERVICE_ID: "order-1"
-      SERVICE_NAME: "order"
-      SERVICE_ADDRESS: "order"
-    ports:
-      - "8082:8082"
-      - "50052:50052"
-    networks:
-      - gin
-    volumes:
+      - ./uploads:/app/uploads
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
     restart: unless-stopped

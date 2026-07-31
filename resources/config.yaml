@@ -1,14 +1,9 @@
 server:
   user:
-    host: "0.0.0.0"  # Docker 网关地址，让容器可以访问宿主机
-    grpcPort: "50051"   # gRPC 监听端口
-    name: "user"
-    httpPort: "8081"  # HTTP 监听端口
-  order:
     host: "0.0.0.0"
-    grpcPort: "50052"   # gRPC 监听端口
-    name: "order"
-    httpPort: "8082"  # HTTP 监听端口
+    grpcPort: "50051"
+    name: "user"
+    httpPort: "8081"
 
 database:
   host: mysql
@@ -17,28 +12,28 @@ database:
   password: 123456
   database: user
   dialect: mysql
-  level: info # 1:Silent 2:Error 3:Warn 4:Info 值越小级别越高
+  level: info
 
 redis:
   host: redis
   port: 6379
-  password: "123456"         # 如果没有密码可以留空
-  db: 0                # 默认 DB 索引
-  poolSize: 10         # 连接池大小，根据项目并发量调整
-  minIdleConns: 2      # 最小空闲连接数
+  password: "123456"
+  db: 0
+  poolSize: 10
+  minIdleConns: 2
 
 sms:
-  provider: aliyun     # 短信服务商，如 aliyun, tencent, twilio 等
+  provider: aliyun
   accessKeyId: "your-access-key-id"
   accessKeySecret: "your-access-key-secret"
-  signName: "YourSign"            # 短信签名
-  templateCode: "SMS_123456789"   # 短信模板 ID
-  region: "cn-hangzhou"           # 区域（如使用阿里云）
-  codeExpireSeconds: 300             # 短信验证码有效时长（秒）
+  signName: "YourSign"
+  templateCode: "SMS_123456789"
+  region: "cn-hangzhou"
+  codeExpireSeconds: 300
 
 jwt:
   secret: "tokentest"
-  expire_seconds: 60480  # 7天
+  expireSeconds: 60480
 
 rocketmq:
   nameServer: "rocketmq-namesrv:9876"
@@ -54,5 +49,5 @@ consul:
 kafka:
   brokers:
     - "kafka:9092"
-  topic: "order-events"
-  groupID: "order-consumer-group"
+  topic: "user-events"
+  groupID: "user-consumer-group"

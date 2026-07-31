@@ -16,6 +16,7 @@ type UserRepo interface {
 	Create(ctx context.Context, user *model.User) error
 	Delete(ctx context.Context, userID int64) error
 	Update(ctx context.Context, user *model.User) error
+	GetUserRoles(ctx context.Context, userID int64) ([]*model.Role, error)
 }
 
 type userRepo struct {
@@ -27,7 +28,13 @@ func NewUserRepo(gormDB *gorm.DB) UserRepo {
 }
 
 func (repo *userRepo) Migrate() error {
-	return repo.db.AutoMigrate(&model.User{})
+	return repo.db.AutoMigrate(
+		&model.User{},
+		&model.Role{},
+		&model.Permission{},
+		&model.RolePermission{},
+		&model.UserRole{},
+	)
 }
 
 func (repo *userRepo) GetByID(ctx context.Context, userID int64) (*model.User, error) {
@@ -78,4 +85,13 @@ func (repo *userRepo) Delete(ctx context.Context, userID int64) error {
 
 func (repo *userRepo) Update(ctx context.Context, user *model.User) error {
 	return repo.db.Save(user).Error
+}
+
+func (repo *userRepo) GetUserRoles(ctx context.Context, userID int64) ([]*model.Role, error) {
+	var roles []*model.Role
+	err := repo.db.WithContext(ctx).
+		Joins("JOIN tbl_user_role ur ON ur.role_id = tbl_role.id").
+		Where("ur.user_id = ?", userID).
+		Find(&roles).Error
+	return roles, err
 }

@@ -13,7 +13,6 @@ RUN go build -o user ./cmd/user
 ENV SERVICE_ID=user-1
 ENV SERVICE_NAME=user
 
-
 EXPOSE 8080
 
-CMD ["./user"]
+CMD ["./user", "-config=./resources/config.yaml"]

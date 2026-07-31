@@ -15,27 +15,30 @@ import (
 )
 
 type UserDTO struct {
-	UserID     int64
-	Username   string
-	Nickname   string
-	Email      string
-	Mobile     string
-	Status     model.UserStatus
-	StatusName string
-	RoleName   string
+	UserID     int64            `json:"user_id"`
+	Username   string           `json:"username"`
+	Nickname   string           `json:"nickname"`
+	Email      string           `json:"email"`
+	Mobile     string           `json:"mobile"`
+	Status     model.UserStatus `json:"status"`
+	StatusName string           `json:"status_name"`
+	RoleName   string           `json:"role_name"`
+	RoleID     int64            `json:"role_id"`
+	Roles      []*model.Role    `json:"roles,omitempty"`
 }
 
 type UserService interface {
 	Login(ctx context.Context, username, password string) (string, *UserDTO, error)
 	GetUserList(ctx context.Context) ([]*UserDTO, int64, error)
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
-	CreateUser(ctx context.Context, username, password, email, nickname string) (*UserDTO, error)
+	CreateUser(ctx context.Context, username, password, email, nickname string, roleID int64) (*UserDTO, error)
 	DeleteUser(ctx context.Context, id int64) error
-	UpdateUser(ctx context.Context, id int64, password, email, nickname string) (*UserDTO, error)
+	UpdateUser(ctx context.Context, id int64, password, email, nickname string, roleID int64, status *model.UserStatus) (*UserDTO, error)
 }
 
 type userService struct {
 	userRepo repository.UserRepo
+	rbacRepo repository.RBACRepo
 	redis    datastore.Store
 }
 
@@ -43,10 +46,13 @@ func NewUserService(userRepo repository.UserRepo, redis datastore.Store) UserSer
 	return &userService{userRepo: userRepo, redis: redis}
 }
 
+func NewUserServiceWithRBAC(userRepo repository.UserRepo, rbacRepo repository.RBACRepo, redis datastore.Store) UserService {
+	return &userService{userRepo: userRepo, rbacRepo: rbacRepo, redis: redis}
+}
+
 func (s *userService) Login(ctx context.Context, username, password string) (string, *UserDTO, error) {
 	logger.Info("Login called with username:", username)
 
-	// 根据用户名获取用户
 	user, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		return "", nil, err
@@ -56,7 +62,6 @@ func (s *userService) Login(ctx context.Context, username, password string) (str
 		return "", nil, errors.New("用户不存在")
 	}
 
-	// 验证密码
 	b, err := crypto.ComparePassword(user.Password, password)
 	if err != nil {
 		return "", nil, err
@@ -66,18 +71,28 @@ func (s *userService) Login(ctx context.Context, username, password string) (str
 		return "", nil, errors.New("密码错误")
 	}
 
-	// 生成JWT token
 	token, err := auth.GenerateToken(strconv.Itoa(int(user.UserID)), user.Username, user.Nickname)
 	if err != nil {
 		return "", nil, err
 	}
 
-	return token, &UserDTO{
+	dto := &UserDTO{
 		UserID:   user.UserID,
 		Username: user.Username,
 		Email:    user.Email,
 		Nickname: user.Nickname,
-	}, nil
+	}
+
+	if s.rbacRepo != nil {
+		roles, _ := s.rbacRepo.GetUserRoles(ctx, user.UserID)
+		dto.Roles = roles
+		if len(roles) > 0 {
+			dto.RoleName = roles[0].Name
+			dto.RoleID = roles[0].ID
+		}
+	}
+
+	return token, dto, nil
 }
 
 func (s *userService) GetUserList(ctx context.Context) ([]*UserDTO, int64, error) {
@@ -88,18 +103,12 @@ func (s *userService) GetUserList(ctx context.Context) ([]*UserDTO, int64, error
 	}
 
 	if total == 0 {
-		return nil, 0, nil
+		return []*UserDTO{}, 0, nil
 	}
 
 	var dtos []*UserDTO
 	for _, ur := range urs {
-		var roleName string
-		if ur.IsSystem {
-			roleName = "管理员"
-		} else {
-			roleName = "普通用户"
-		}
-		dtos = append(dtos, &UserDTO{
+		dto := &UserDTO{
 			UserID:     ur.UserID,
 			Username:   ur.Username,
 			Nickname:   ur.Nickname,
@@ -107,8 +116,19 @@ func (s *userService) GetUserList(ctx context.Context) ([]*UserDTO, int64, error
 			Mobile:     ur.Mobile,
 			Status:     ur.Status,
 			StatusName: ur.Status.ToText(),
-			RoleName:   roleName,
-		})
+		}
+
+		if s.rbacRepo != nil {
+			roles, _ := s.rbacRepo.GetUserRoles(ctx, ur.UserID)
+			if len(roles) > 0 {
+				dto.RoleName = roles[0].Name
+				dto.RoleID = roles[0].ID
+			} else {
+				dto.RoleName = "未分配"
+			}
+		}
+
+		dtos = append(dtos, dto)
 	}
 
 	return dtos, total, nil
@@ -125,19 +145,31 @@ func (s *userService) GetUser(ctx context.Context, id int64) (*UserDTO, error) {
 		return nil, nil
 	}
 
-	return &UserDTO{
-		UserID:   ur.UserID,
-		Username: ur.Username,
-		Email:    ur.Email,
-		Nickname: ur.Nickname,
-		Mobile:   ur.Mobile,
-	}, nil
+	dto := &UserDTO{
+		UserID:     ur.UserID,
+		Username:   ur.Username,
+		Email:      ur.Email,
+		Nickname:   ur.Nickname,
+		Mobile:     ur.Mobile,
+		Status:     ur.Status,
+		StatusName: ur.Status.ToText(),
+	}
+
+	if s.rbacRepo != nil {
+		roles, _ := s.rbacRepo.GetUserRoles(ctx, ur.UserID)
+		dto.Roles = roles
+		if len(roles) > 0 {
+			dto.RoleName = roles[0].Name
+			dto.RoleID = roles[0].ID
+		}
+	}
+
+	return dto, nil
 }
 
-func (s *userService) CreateUser(ctx context.Context, username, password, email, nickname string) (*UserDTO, error) {
+func (s *userService) CreateUser(ctx context.Context, username, password, email, nickname string, roleID int64) (*UserDTO, error) {
 	logger.Info("CreateUser called with username:", username)
 
-	// 检查用户名是否已存在
 	existingUser, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		return nil, err
@@ -146,13 +178,11 @@ func (s *userService) CreateUser(ctx context.Context, username, password, email,
 		return nil, errors.New("用户名已存在")
 	}
 
-	// 加密密码
 	hashedPassword, err := crypto.HashPassword(password)
 	if err != nil {
 		return nil, err
 	}
 
-	// 创建新用户
 	user := &model.User{
 		UserID:   idgen.NewID(),
 		Username: username,
@@ -163,26 +193,36 @@ func (s *userService) CreateUser(ctx context.Context, username, password, email,
 		IsSystem: false,
 	}
 
-	// 保存到数据库
 	err = s.userRepo.Create(ctx, user)
 	if err != nil {
 		return nil, err
 	}
 
-	// 返回UserDTO
-	return &UserDTO{
-		UserID:   user.UserID,
-		Username: user.Username,
-		Email:    user.Email,
-		Nickname: user.Nickname,
-		Mobile:   user.Mobile,
-	}, nil
+	dto := &UserDTO{
+		UserID:     user.UserID,
+		Username:   user.Username,
+		Email:      user.Email,
+		Nickname:   user.Nickname,
+		Mobile:     user.Mobile,
+		Status:     user.Status,
+		StatusName: user.Status.ToText(),
+	}
+
+	if s.rbacRepo != nil && roleID > 0 {
+		_ = s.rbacRepo.SetUserRole(ctx, user.UserID, roleID)
+		role, _ := s.rbacRepo.GetRoleByID(ctx, roleID)
+		if role != nil {
+			dto.RoleName = role.Name
+			dto.RoleID = role.ID
+		}
+	}
+
+	return dto, nil
 }
 
 func (s *userService) DeleteUser(ctx context.Context, id int64) error {
 	logger.Info("DeleteUser called with ID:", id)
 
-	// 检查用户是否存在
 	existingUser, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -191,14 +231,12 @@ func (s *userService) DeleteUser(ctx context.Context, id int64) error {
 		return errors.New("用户不存在")
 	}
 
-	// 删除用户
 	return s.userRepo.Delete(ctx, id)
 }
 
-func (s *userService) UpdateUser(ctx context.Context, id int64, password, email, nickname string) (*UserDTO, error) {
+func (s *userService) UpdateUser(ctx context.Context, id int64, password, email, nickname string, roleID int64, status *model.UserStatus) (*UserDTO, error) {
 	logger.Info("UpdateUser called with ID:", id)
 
-	// 检查用户是否存在
 	existingUser, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -207,7 +245,6 @@ func (s *userService) UpdateUser(ctx context.Context, id int64, password, email,
 		return nil, errors.New("用户不存在")
 	}
 
-	// 更新用户信息
 	if password != "" {
 		hashedPassword, err := crypto.HashPassword(password)
 		if err != nil {
@@ -221,19 +258,35 @@ func (s *userService) UpdateUser(ctx context.Context, id int64, password, email,
 	if nickname != "" {
 		existingUser.Nickname = nickname
 	}
+	if status != nil {
+		existingUser.Status = *status
+	}
 
-	// 保存到数据库
 	err = s.userRepo.Update(ctx, existingUser)
 	if err != nil {
 		return nil, err
 	}
 
-	// 返回更新后的用户信息
-	return &UserDTO{
-			UserID:   existingUser.UserID,
-			Username: existingUser.Username,
-			Email:    existingUser.Email,
-			Nickname: existingUser.Nickname,
-		},
-		nil
+	dto := &UserDTO{
+		UserID:     existingUser.UserID,
+		Username:   existingUser.Username,
+		Email:      existingUser.Email,
+		Nickname:   existingUser.Nickname,
+		Status:     existingUser.Status,
+		StatusName: existingUser.Status.ToText(),
+	}
+
+	if s.rbacRepo != nil && roleID > 0 {
+		_ = s.rbacRepo.SetUserRole(ctx, existingUser.UserID, roleID)
+	}
+	if s.rbacRepo != nil {
+		roles, _ := s.rbacRepo.GetUserRoles(ctx, existingUser.UserID)
+		dto.Roles = roles
+		if len(roles) > 0 {
+			dto.RoleName = roles[0].Name
+			dto.RoleID = roles[0].ID
+		}
+	}
+
+	return dto, nil
 }
