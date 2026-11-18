@@ -2,7 +2,7 @@ package db
 
 import (
 	medicalModel "github.com/teakingwang/backend/internal/user/medical/model"
-	"github.com/te
+	"github.com/teakingwang/backend/internal/user/model"
 	"gorm.io/gorm"
 )
 

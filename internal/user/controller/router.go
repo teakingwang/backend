@@ -5,7 +5,7 @@ import (
 	"github.com/teakingwang/backend/internal/user/handler"
 	medHandler "github.com/teakingwang/backend/internal/user/medical/handler"
 	medSvc "github.com/teakingwang/backend/internal/user/medical/service"
-	"github.com/teakingwang/backend/internal/user/s
+	"github.com/teakingwang/backend/internal/user/service"
 	"github.com/teakingwang/backend/pkg/middleware"
 )
 

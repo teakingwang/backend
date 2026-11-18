@@ -7,7 +7,6 @@ import (
 	medicalRepo "github.com/teakingwang/backend/internal/user/medical/repository"
 	medicalSvc "github.com/teakingwang/backend/internal/user/medical/service"
 	"github.com/teakingwang/backend/internal/user/model"
-	"gi
 	"github.com/teakingwang/backend/internal/user/repository"
 	"github.com/teakingwang/backend/internal/user/service"
 	"github.com/teakingwang/backend/pkg/datastore"
