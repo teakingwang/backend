@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package medical;
+
+option go_package = "github.com/teakingwang/backend/api/medical;medical";
+
+message GetMedicalRecordRequest {
+  int64 id = 1;
+}
+
+message GetMedicalRecordResponse {
+  int64 id = 1;
+  int64 user_id = 2;
+  string title = 3;
+}
+
+message ListMedicalRecordsRequest {
+  int64 user_id = 1;
+}
+
+message MedicalRecord {
+  int64 id = 1;
+  int64 parent_id = 2;
+  int64 user_id = 3;
+  string title = 4;
+  string description = 5;
+  string hospital_name = 6;
+  string visit_date = 7;
+}
+
+message ListMedicalRecordsResponse {
+  repeated MedicalRecord records = 1;
+}
+
+message DeleteMedicalRecordRequest {
+  int64 id = 1;
+}
+
+message DeleteMedicalRecordResponse {}
+
+service MedicalService {
+  rpc GetMedicalRecord(GetMedicalRecordRequest) returns (GetMedicalRecordResponse);
+  rpc ListMedicalRecords(ListMedicalRecordsRequest) returns (ListMedicalRecordsResponse);
+  rpc DeleteMedicalRecord(DeleteMedicalRecordRequest) returns (DeleteMedicalRecordResponse);
+}

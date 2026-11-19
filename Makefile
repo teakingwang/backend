@@ -37,8 +37,7 @@ proto:
 build:
 	@echo "🔨 Building all services..."
 	go build -o bin/user-service ./cmd/user
-	go build -o bin/order-service ./cmd/order
-	go build -o bin/gateway ./cmd/gateway
+	go build -o bin/medical-service ./cmd/medical
 	@echo "✅ Build completed."
 
 # 清理生成的二进制文件
@@ -55,12 +54,7 @@ clean:
 run-user:
 	go run ./cmd/user
 
-# 运行 order-service
-.PHONY: run-order
-run-order:
-	go run ./cmd/order
-
-# 运行 gateway
-.PHONY: run-gateway
-run-gateway:
-	go run ./cmd/gateway
+# 运行 medical-service
+.PHONY: run-medical
+run-medical:
+	go run ./cmd/medical

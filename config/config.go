@@ -32,7 +32,8 @@ type KafkaConfig struct {
 }
 
 type ServerConfig struct {
-	User ServiceConfig `yaml:"user" json:"user"`
+	User    ServiceConfig `yaml:"user" json:"user"`
+	Medical ServiceConfig `yaml:"medical" json:"medical"`
 }
 
 type ServiceConfig struct {

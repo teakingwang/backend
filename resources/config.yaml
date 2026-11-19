@@ -4,6 +4,11 @@ server:
     grpcPort: "50051"
     name: "user"
     httpPort: "8081"
+  medical:
+    host: "0.0.0.0"
+    grpcPort: "50052"
+    name: "medical"
+    httpPort: "8082"
 
 database:
   host: mysql

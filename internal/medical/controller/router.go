@@ -7,8 +7,11 @@ import (
 	"github.com/teakingwang/backend/pkg/middleware"
 )
 
+const maxMultipartMemory = 32 << 20
+
 func NewHTTPRouter(svc service.MedicalRecordService, uploadDir string) *gin.Engine {
 	r := gin.Default()
+	r.MaxMultipartMemory = maxMultipartMemory
 
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -34,7 +37,9 @@ func NewHTTPRouter(svc service.MedicalRecordService, uploadDir string) *gin.Engi
 		v1.GET("/list", h.ListRecords)
 		v1.GET("/:id", h.GetRecord)
 		v1.POST("/create", h.CreateRecord)
+		v1.PUT("/:id", h.UpdateRecord)
 		v1.DELETE("/:id", h.DeleteRecord)
+		v1.DELETE("/invoice/:id", h.DeleteInvoice)
 	}
 
 	return r

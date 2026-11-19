@@ -4,6 +4,11 @@ server:
     grpcPort: "50051"   # gRPC 监听端口
     name: "user"
     httpPort: "18081"  # HTTP 监听端口
+  medical:
+    host: "0.0.0.0"
+    grpcPort: "50052"
+    name: "medical"
+    httpPort: "18082"
 
 database:
   host: 127.0.0.1

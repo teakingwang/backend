@@ -34,3 +34,5 @@ go.work.sum
 
 .idea
 /user
+/medical
+/bin/

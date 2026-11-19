@@ -8,15 +8,13 @@ import (
 
 type MedicalRecord struct {
 	ID           int64  `gorm:"column:id;primaryKey"`
+	ParentID     int64  `gorm:"column:parent_id;default:0;index"`
 	UserID       int64  `gorm:"column:user_id;not null;index"`
-	RecordType   int8   `gorm:"column:record_type;not null;default:1"` // 1=就诊病历, 2=电子发票
+	RecordType   int8   `gorm:"column:record_type;not null;default:1"`
 	Title        string `gorm:"column:title;not null;size:255"`
-	Description  string `gorm:"column:description;size:1000"`
+	Description  string `gorm:"column:description;type:text"`
 	HospitalName string `gorm:"column:hospital_name;size:128"`
 	VisitDate    string `gorm:"column:visit_date;size:32"`
-	FileName     string `gorm:"column:file_name;size:255"`
-	FileURL      string `gorm:"column:file_url;size:512"`
-	FileSize     int64  `gorm:"column:file_size;default:0"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    gorm.DeletedAt `gorm:"index"`
